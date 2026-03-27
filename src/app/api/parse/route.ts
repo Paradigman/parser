@@ -10,61 +10,44 @@ interface Transaction {
 function parseTransactions(html: string): Transaction[] {
   const transactions: Transaction[] = [];
 
-  // Убираем HTML теги и декодируем entities
+  // Убираем HTML теги, сохраняя структуру
   const textContent = html
-    .replace(/<[^>]+>/g, "\n")
+    .replace(/<[^>]+>/g, " ")
     .replace(/&gt;/g, ">")
     .replace(/&lt;/g, "<")
     .replace(/&amp;/g, "&")
-    .replace(/&nbsp;/g, " ");
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ");
 
-  // Разбиваем на строки и ищем транзакции
-  const lines = textContent.split("\n");
-  let currentDate = "";
-
-  for (const line of lines) {
-    const trimmed = line.trim();
+  // Ищем паттерн: дата + персонаж -> ClanFire: сумма
+  // Формат: "16 Mar 19:46 ... ups -> ClanFire: 111 a."
+  const fullPattern = /(\d{1,2}\s+\w{3}\s+\d{1,2}:\d{2})[^>]*?(\w+)\s*->\s*ClanFire\s*:\s*(\d+)\s*a\./gi;
+  let match;
+  
+  while ((match = fullPattern.exec(textContent)) !== null) {
+    const date = match[1];
+    const characterName = match[2];
+    const amount = parseInt(match[3], 10);
     
-    // Ищем дату
-    const dateMatch = trimmed.match(/(\d{1,2}\s+\w{3}\s+\d{1,2}:\d{2})/);
-    if (dateMatch) {
-      currentDate = dateMatch[1];
-    }
-
-    // Ищем паттерн: ИмяПерсонажа -> ClanFire:СУММА a.
-    // Разные варианты написания
-    const patterns = [
-      /^(\w+)\s*->\s*ClanFire\s*:\s*(\d+)\s*a\./i,
-      /^(\w+)\s*->\s*ClanFire\s*(\d+)\s*a\./i,
-      /(\w+)\s*->\s*ClanFire\s*:\s*(\d+)\s*a\./i,
-    ];
-
-    for (const pattern of patterns) {
-      const match = trimmed.match(pattern);
-      if (match) {
-        const characterName = match[1];
-        const amount = parseInt(match[2], 10);
-        
-        if (characterName && amount > 0 && characterName.toLowerCase() !== "clanfire") {
-          transactions.push({
-            characterName,
-            amount,
-            date: currentDate,
-            type: "Покупка",
-          });
-          break;
-        }
-      }
+    if (characterName && amount > 0 && characterName.toLowerCase() !== "clanfire") {
+      transactions.push({
+        characterName,
+        amount,
+        date,
+        type: "Покупка",
+      });
     }
   }
 
-  // Если не нашли построчно, попробуем глобальный поиск
+  // Если полный паттерн не сработал, ищем без даты
   if (transactions.length === 0) {
-    const globalText = textContent.replace(/\s+/g, " ");
-    const globalPattern = /(\w+)\s*->\s*ClanFire\s*:?\s*(\d+)\s*a\./gi;
-    let match;
+    const simplePattern = /(\w+)\s*->\s*ClanFire\s*:\s*(\d+)\s*a\./gi;
+    let txIndex = 0;
     
-    while ((match = globalPattern.exec(globalText)) !== null) {
+    // Сначала соберём все даты
+    const dates = textContent.match(/\d{1,2}\s+\w{3}\s+\d{1,2}:\d{2}/g) || [];
+    
+    while ((match = simplePattern.exec(textContent)) !== null) {
       const characterName = match[1];
       const amount = parseInt(match[2], 10);
       
@@ -72,21 +55,15 @@ function parseTransactions(html: string): Transaction[] {
         transactions.push({
           characterName,
           amount,
-          date: "",
+          date: dates[txIndex] || `tx_${txIndex}`,
           type: "Покупка",
         });
+        txIndex++;
       }
     }
   }
 
   console.log("Найдено транзакций:", transactions.length);
-  if (transactions.length > 0) {
-    console.log("Первые 5 транзакций:", transactions.slice(0, 5));
-  } else {
-    // Debug: покажем что есть в тексте
-    const arrows = textContent.match(/\w+\s*->\s*\w+/g);
-    console.log("Стрелки в тексте:", arrows?.slice(0, 10));
-  }
 
   return transactions;
 }
@@ -94,18 +71,23 @@ function parseTransactions(html: string): Transaction[] {
 function findTotalPages(html: string): number {
   let totalPages = 1;
 
+  // Ищем ссылки с p=N
   const hrefMatches = html.matchAll(/p=(\d+)/g);
   for (const match of hrefMatches) {
     const pageNum = parseInt(match[1], 10);
     if (pageNum > totalPages) totalPages = pageNum;
   }
 
-  const bracketMatches = html.matchAll(/<\s*(\d+)\s*>/g);
+  // Ищем номера страниц в скобках <N>
+  const bracketMatches = html.matchAll(/>\s*(\d+)\s*</g);
   for (const match of bracketMatches) {
     const pageNum = parseInt(match[1], 10);
-    if (pageNum > totalPages) totalPages = pageNum;
+    if (pageNum > 1 && pageNum < 100 && pageNum > totalPages) {
+      totalPages = pageNum;
+    }
   }
 
+  console.log("Определено страниц:", totalPages);
   return totalPages;
 }
 
@@ -245,10 +227,14 @@ export async function POST(request: Request) {
     }
 
     totalPages = findTotalPages(firstHtml);
+    console.log("Всего страниц найдено:", totalPages);
+    
     const firstTransactions = parseTransactions(firstHtml);
     allTransactions.push(...firstTransactions);
+    console.log("Транзакций со страницы 1:", firstTransactions.length);
 
     for (let pageNum = 2; pageNum <= Math.min(totalPages, 50); pageNum++) {
+      console.log(`Загрузка страницы ${pageNum}...`);
       const pageUrl = `https://interlude-online.com/lk.php?page=characterLog&characterId=${charId}&p=${pageNum}`;
       
       const pageResponse = await fetch(pageUrl, {
@@ -256,6 +242,7 @@ export async function POST(request: Request) {
           Cookie: cookies,
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          Referer: "https://interlude-online.com/lk.html",
         },
       });
 
@@ -263,10 +250,15 @@ export async function POST(request: Request) {
         const pageHtml = await pageResponse.text();
         const pageTransactions = parseTransactions(pageHtml);
         allTransactions.push(...pageTransactions);
+        console.log(`Транзакций со страницы ${pageNum}:`, pageTransactions.length);
+      } else {
+        console.log(`Ошибка загрузки страницы ${pageNum}:`, pageResponse.status);
       }
 
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
+    
+    console.log("Всего транзакций до дедупликации:", allTransactions.length);
 
     const uniqueTransactions = allTransactions.filter((tx, index, self) => {
       return (
