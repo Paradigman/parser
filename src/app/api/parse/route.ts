@@ -224,40 +224,65 @@ export async function POST(request: Request) {
       );
     }
 
-    totalPages = findTotalPages(firstHtml);
-    console.log("Всего страниц найдено:", totalPages);
-    
-    // Если пагинация не найдена, пробуем загрузить до 10 страниц
-    if (totalPages === 1) {
-      totalPages = 10; // Попробуем загрузить больше страниц
-      console.log("Пагинация не найдена, пробуем 10 страниц");
-    }
+    // Пагинация определяется динамически через API
     
     const firstTransactions = parseTransactions(firstHtml);
     allTransactions.push(...firstTransactions);
     console.log("Транзакций со страницы 1:", firstTransactions.length);
+    
+    // Логируем первую и последнюю транзакцию для проверки
+    if (firstTransactions.length > 0) {
+      console.log("Первая транзакция страницы 1:", firstTransactions[0]);
+      console.log("Последняя транзакция страницы 1:", firstTransactions[firstTransactions.length - 1]);
+    }
 
-    for (let pageNum = 2; pageNum <= Math.min(totalPages, 50); pageNum++) {
-      console.log(`Загрузка страницы ${pageNum}...`);
-      const pageUrl = `https://interlude-online.com/lk.php?page=characterLog&characterId=${charId}&p=${pageNum}`;
+    // Извлекаем имя персонажа из первой страницы для пагинации
+    const characterNameMatch = firstHtml.match(/Журнал персонажа[:\s]*<[^>]*>([^<]+)</) || 
+                               firstHtml.match(/<h\d[^>]*>[^<]*?(\w+)[^<]*?<\/h\d>/) ||
+                               firstHtml.match(/characterName['":\s]+['"]?(\w+)['"]?/);
+    const characterName = characterNameMatch ? characterNameMatch[1].trim() : "ClanFire";
+    console.log("Имя персонажа для пагинации:", characterName);
+
+    // Используем XHR API для пагинации
+    for (let pageNum = 2; pageNum <= 50; pageNum++) {
+      console.log(`Загрузка страницы ${pageNum} через API...`);
       
-      const pageResponse = await fetch(pageUrl, {
+      const formData = new URLSearchParams();
+      formData.append("paginationNumber", pageNum.toString());
+      formData.append("arg", characterName);
+      
+      const pageResponse = await fetch("https://interlude-online.com/api/characterLog/pagination", {
+        method: "POST",
         headers: {
           Cookie: cookies,
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          Referer: "https://interlude-online.com/lk.html",
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "*/*",
+          Referer: `https://interlude-online.com/lk.php?page=characterLog&characterId=${charId}`,
+          "X-Requested-With": "XMLHttpRequest",
         },
+        body: formData.toString(),
       });
 
       if (pageResponse.ok) {
         const pageHtml = await pageResponse.text();
-        const pageTransactions = parseTransactions(pageHtml);
+        console.log(`Ответ страницы ${pageNum}, длина:`, pageHtml.length);
         
-        if (pageTransactions.length === 0) {
+        // Если ответ пустой или слишком короткий - страниц больше нет
+        if (pageHtml.length < 50) {
           console.log(`Страница ${pageNum} пустая, останавливаем`);
           break;
         }
+        
+        const pageTransactions = parseTransactions(pageHtml);
+        
+        if (pageTransactions.length === 0) {
+          console.log(`Страница ${pageNum} без транзакций, останавливаем`);
+          break;
+        }
+        
+        // Логируем первую транзакцию для проверки
+        console.log(`Первая транзакция страницы ${pageNum}:`, pageTransactions[0]);
         
         allTransactions.push(...pageTransactions);
         console.log(`Транзакций со страницы ${pageNum}:`, pageTransactions.length);
@@ -282,6 +307,8 @@ export async function POST(request: Request) {
         )
       );
     });
+    
+    console.log("Уникальных транзакций после дедупликации:", uniqueTransactions.length);
 
     const aggregated = uniqueTransactions.reduce(
       (acc, tx) => {
