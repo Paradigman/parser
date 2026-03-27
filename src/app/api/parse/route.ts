@@ -227,6 +227,12 @@ export async function POST(request: Request) {
     totalPages = findTotalPages(firstHtml);
     console.log("Всего страниц найдено:", totalPages);
     
+    // Если пагинация не найдена, пробуем загрузить до 10 страниц
+    if (totalPages === 1) {
+      totalPages = 10; // Попробуем загрузить больше страниц
+      console.log("Пагинация не найдена, пробуем 10 страниц");
+    }
+    
     const firstTransactions = parseTransactions(firstHtml);
     allTransactions.push(...firstTransactions);
     console.log("Транзакций со страницы 1:", firstTransactions.length);
@@ -247,10 +253,17 @@ export async function POST(request: Request) {
       if (pageResponse.ok) {
         const pageHtml = await pageResponse.text();
         const pageTransactions = parseTransactions(pageHtml);
+        
+        if (pageTransactions.length === 0) {
+          console.log(`Страница ${pageNum} пустая, останавливаем`);
+          break;
+        }
+        
         allTransactions.push(...pageTransactions);
         console.log(`Транзакций со страницы ${pageNum}:`, pageTransactions.length);
       } else {
         console.log(`Ошибка загрузки страницы ${pageNum}:`, pageResponse.status);
+        break;
       }
 
       await new Promise((resolve) => setTimeout(resolve, 200));
