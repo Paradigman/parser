@@ -129,11 +129,11 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+        <header className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
             Депозиты персонажей GVE
           </h1>
-          <p className="text-gray-400 mt-2">
+          <p className="text-gray-400 mt-1 md:mt-2 text-sm md:text-base">
             Парсер журнала транзакций Interlude-Online
           </p>
         </header>
@@ -267,42 +267,129 @@ export default function Home() {
 
         {/* Stats */}
         {data.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <div className="text-gray-400 text-sm">Adena на персонаже</div>
-              <div className="text-xl md:text-2xl font-bold text-yellow-400">
-                {formatNumber(currentAdena)} a.
+          <div className="mb-6 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0">
+            <div className="flex md:grid md:grid-cols-5 gap-3 md:gap-4 min-w-max md:min-w-0">
+              <div className="bg-gray-800 rounded-lg p-3 md:p-4 border border-gray-700 min-w-[140px] md:min-w-0">
+                <div className="text-gray-400 text-xs md:text-sm">Adena на персонаже</div>
+                <div className="text-lg md:text-2xl font-bold text-yellow-400 whitespace-nowrap">
+                  {formatNumber(currentAdena)} a.
+                </div>
               </div>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <div className="text-gray-400 text-sm">Всего внесено</div>
-              <div className="text-xl md:text-2xl font-bold text-green-400">
-                {formatNumber(totalDeposited)} a.
+              <div className="bg-gray-800 rounded-lg p-3 md:p-4 border border-gray-700 min-w-[140px] md:min-w-0">
+                <div className="text-gray-400 text-xs md:text-sm">Всего внесено</div>
+                <div className="text-lg md:text-2xl font-bold text-green-400 whitespace-nowrap">
+                  {formatNumber(totalDeposited)} a.
+                </div>
               </div>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <div className="text-gray-400 text-sm">Персонажей</div>
-              <div className="text-xl md:text-2xl font-bold text-blue-400">
-                {data.length}
+              <div className="bg-gray-800 rounded-lg p-3 md:p-4 border border-gray-700 min-w-[100px] md:min-w-0">
+                <div className="text-gray-400 text-xs md:text-sm">Персонажей</div>
+                <div className="text-lg md:text-2xl font-bold text-blue-400">
+                  {data.length}
+                </div>
               </div>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <div className="text-gray-400 text-sm">Показано</div>
-              <div className="text-xl md:text-2xl font-bold text-gray-300">
-                {filteredAndSortedData.length}
+              <div className="bg-gray-800 rounded-lg p-3 md:p-4 border border-gray-700 min-w-[100px] md:min-w-0">
+                <div className="text-gray-400 text-xs md:text-sm">Показано</div>
+                <div className="text-lg md:text-2xl font-bold text-gray-300">
+                  {filteredAndSortedData.length}
+                </div>
               </div>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <div className="text-gray-400 text-sm">Топ вкладчик</div>
-              <div className="text-xl md:text-2xl font-bold text-purple-400 truncate">
-                {data[0]?.characterName || "-"}
+              <div className="bg-gray-800 rounded-lg p-3 md:p-4 border border-gray-700 min-w-[120px] md:min-w-0">
+                <div className="text-gray-400 text-xs md:text-sm">Топ вкладчик</div>
+                <div className="text-lg md:text-2xl font-bold text-purple-400 truncate">
+                  {data[0]?.characterName || "-"}
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Table */}
-        <div className="bg-gray-800 rounded-xl shadow-2xl border border-gray-700 overflow-hidden">
+        {/* Sort buttons for mobile */}
+        {data.length > 0 && (
+          <div className="flex md:hidden gap-2 mb-4 overflow-x-auto pb-2">
+            <button
+              onClick={() => handleSort("totalDeposited")}
+              className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap ${
+                sortField === "totalDeposited" ? "bg-yellow-500 text-black" : "bg-gray-700"
+              }`}
+            >
+              По сумме {sortField === "totalDeposited" && (sortDirection === "desc" ? "↓" : "↑")}
+            </button>
+            <button
+              onClick={() => handleSort("characterName")}
+              className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap ${
+                sortField === "characterName" ? "bg-yellow-500 text-black" : "bg-gray-700"
+              }`}
+            >
+              По имени {sortField === "characterName" && (sortDirection === "desc" ? "↓" : "↑")}
+            </button>
+            <button
+              onClick={() => handleSort("transactionCount")}
+              className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap ${
+                sortField === "transactionCount" ? "bg-yellow-500 text-black" : "bg-gray-700"
+              }`}
+            >
+              По кол-ву {sortField === "transactionCount" && (sortDirection === "desc" ? "↓" : "↑")}
+            </button>
+          </div>
+        )}
+
+        {/* Mobile Cards */}
+        <div className="md:hidden space-y-3">
+          {filteredAndSortedData.length === 0 ? (
+            <div className="bg-gray-800 rounded-xl p-6 text-center text-gray-500 border border-gray-700">
+              {loading
+                ? "Загрузка данных..."
+                : data.length === 0
+                  ? 'Введите куки и нажмите "Загрузить данные"'
+                  : "Персонажи не найдены"}
+            </div>
+          ) : (
+            filteredAndSortedData.map((item, index) => (
+              <div
+                key={item.characterName}
+                className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden"
+              >
+                <div
+                  className="p-4 flex items-center justify-between cursor-pointer active:bg-gray-700/50"
+                  onClick={() => setExpandedRow(expandedRow === item.characterName ? null : item.characterName)}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-gray-500 font-mono text-sm w-6">{index + 1}</span>
+                    <div>
+                      <div className="font-medium text-white">{item.characterName}</div>
+                      <div className="text-xs text-gray-500">
+                        {item.transactionCount} транзакций • {item.lastDeposit?.date || "-"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-green-400">
+                      +{formatNumber(item.totalDeposited)}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      посл: +{formatNumber(item.lastDeposit?.amount || 0)}
+                    </div>
+                  </div>
+                </div>
+                {expandedRow === item.characterName && (
+                  <div className="border-t border-gray-700 bg-gray-900/30 p-3">
+                    <div className="max-h-48 overflow-y-auto space-y-2">
+                      {item.transactions.map((tx, txIndex) => (
+                        <div key={txIndex} className="flex justify-between text-sm">
+                          <span className="text-gray-400">{tx.date}</span>
+                          <span className="text-green-400">+{formatNumber(tx.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table */}
+        <div className="hidden md:block bg-gray-800 rounded-xl shadow-2xl border border-gray-700 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -332,7 +419,7 @@ export default function Home() {
                       Кол-во <span>{getSortIcon("transactionCount")}</span>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase hidden md:table-cell">
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase">
                     Последний
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase w-12"></th>
@@ -345,7 +432,7 @@ export default function Home() {
                       {loading
                         ? "Загрузка данных..."
                         : data.length === 0
-                          ? "Введите куки и нажмите \"Загрузить данные\""
+                          ? 'Введите куки и нажмите "Загрузить данные"'
                           : "Персонажи не найдены"}
                     </td>
                   </tr>
@@ -367,7 +454,7 @@ export default function Home() {
                         <td className="px-4 py-3 text-right text-gray-300">
                           {item.transactionCount}
                         </td>
-                        <td className="px-4 py-3 text-right hidden md:table-cell">
+                        <td className="px-4 py-3 text-right">
                           <div className="text-green-400 text-sm">
                             +{formatNumber(item.lastDeposit?.amount || 0)}
                           </div>
@@ -418,7 +505,7 @@ export default function Home() {
           </div>
         </div>
 
-        <footer className="mt-8 text-center text-gray-500 text-sm">
+        <footer className="mt-6 md:mt-8 text-center text-gray-500 text-xs md:text-sm pb-4">
           Парсер депозитов GVE • Данные с interlude-online.com
         </footer>
       </div>
