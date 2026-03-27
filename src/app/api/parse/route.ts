@@ -90,6 +90,45 @@ function parseDate(dateStr: string): Date {
   return new Date(0);
 }
 
+async function fetchCharacterAdena(cookies: string, characterId: string): Promise<number> {
+  try {
+    const url = `https://interlude-online.com/lk.php?page=characters`;
+    const response = await fetch(url, {
+      headers: {
+        Cookie: cookies,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+    });
+
+    if (!response.ok) return 0;
+
+    const html = await response.text();
+    
+    // Ищем Adena рядом с ClanFire или в общем контексте
+    // Паттерн: Adena: 12345 или Adena 12 345
+    const adenaMatch = html.match(/Adena[:\s]*([0-9\s,.']+)/i);
+    if (adenaMatch) {
+      const adenaStr = adenaMatch[1].replace(/[\s,.']/g, "");
+      return parseInt(adenaStr, 10) || 0;
+    }
+
+    // Альтернативный поиск - ищем число после ClanFire и Adena
+    const textContent = html.replace(/<[^>]+>/g, " ");
+    const clanFireSection = textContent.match(/ClanFire[\s\S]{0,500}Adena[:\s]*([0-9\s,.']+)/i);
+    if (clanFireSection) {
+      const adenaStr = clanFireSection[1].replace(/[\s,.']/g, "");
+      return parseInt(adenaStr, 10) || 0;
+    }
+
+    console.log("Adena не найдена в HTML");
+    return 0;
+  } catch (error) {
+    console.error("Ошибка получения Adena:", error);
+    return 0;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -230,9 +269,9 @@ export async function POST(request: Request) {
 
     const totalDeposited = sortedData.reduce((sum, item) => sum + item.totalDeposited, 0);
 
-    // Debug info
-    const debugArrows = firstHtml.match(/\w+\s*-&gt;\s*\w+/g) || [];
-    const debugAmounts = firstHtml.match(/\d+\s*a\./gi) || [];
+    // Получаем текущую Adena на персонаже
+    const currentAdena = await fetchCharacterAdena(cookies, charId);
+    console.log("Текущая Adena:", currentAdena);
 
     return NextResponse.json({
       success: true,
@@ -240,12 +279,7 @@ export async function POST(request: Request) {
       totalTransactions: uniqueTransactions.length,
       totalPages,
       totalDeposited,
-      debug: {
-        htmlLength: firstHtml.length,
-        arrowsFound: debugArrows.slice(0, 10),
-        amountsFound: debugAmounts.slice(0, 10),
-        rawTransactionsCount: allTransactions.length,
-      }
+      currentAdena,
     });
   } catch (error) {
     console.error("Parse error:", error);

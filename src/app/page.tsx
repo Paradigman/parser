@@ -33,6 +33,7 @@ export default function Home() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [totalDeposited, setTotalDeposited] = useState(0);
+  const [currentAdena, setCurrentAdena] = useState(0);
 
   useEffect(() => {
     const savedCookies = localStorage.getItem("gve_cookies");
@@ -72,11 +73,7 @@ export default function Home() {
 
       setData(result.data || []);
       setTotalDeposited(result.totalDeposited || 0);
-      
-      // Показать debug info в консоли
-      if (result.debug) {
-        console.log("Debug info:", result.debug);
-      }
+      setCurrentAdena(result.currentAdena || 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
@@ -270,7 +267,13 @@ export default function Home() {
 
         {/* Stats */}
         {data.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <div className="text-gray-400 text-sm">Adena на персонаже</div>
+              <div className="text-xl md:text-2xl font-bold text-yellow-400">
+                {formatNumber(currentAdena)} a.
+              </div>
+            </div>
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
               <div className="text-gray-400 text-sm">Всего внесено</div>
               <div className="text-xl md:text-2xl font-bold text-green-400">
@@ -279,13 +282,13 @@ export default function Home() {
             </div>
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
               <div className="text-gray-400 text-sm">Персонажей</div>
-              <div className="text-xl md:text-2xl font-bold text-yellow-400">
+              <div className="text-xl md:text-2xl font-bold text-blue-400">
                 {data.length}
               </div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
               <div className="text-gray-400 text-sm">Показано</div>
-              <div className="text-xl md:text-2xl font-bold text-blue-400">
+              <div className="text-xl md:text-2xl font-bold text-gray-300">
                 {filteredAndSortedData.length}
               </div>
             </div>
