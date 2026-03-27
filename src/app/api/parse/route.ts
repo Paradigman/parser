@@ -265,8 +265,22 @@ export async function POST(request: Request) {
       });
 
       if (pageResponse.ok) {
-        const pageHtml = await pageResponse.text();
-        console.log(`Ответ страницы ${pageNum}, длина:`, pageHtml.length);
+        const responseText = await pageResponse.text();
+        console.log(`Ответ страницы ${pageNum}, длина:`, responseText.length);
+        
+        // API возвращает JSON: {"success":true,"object":"<pagination>#:#<table rows>"}
+        let pageHtml = responseText;
+        try {
+          const jsonResponse = JSON.parse(responseText);
+          if (jsonResponse.success && jsonResponse.object) {
+            // Извлекаем HTML после #:#
+            const parts = jsonResponse.object.split("#:#");
+            pageHtml = parts.length > 1 ? parts[1] : jsonResponse.object;
+            console.log(`JSON распарсен, HTML длина:`, pageHtml.length);
+          }
+        } catch {
+          console.log("Ответ не JSON, используем как HTML");
+        }
         
         // Если ответ пустой или слишком короткий - страниц больше нет
         if (pageHtml.length < 50) {
