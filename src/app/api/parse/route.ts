@@ -71,21 +71,19 @@ function parseTransactions(html: string): Transaction[] {
 function findTotalPages(html: string): number {
   let totalPages = 1;
 
-  // Ищем ссылки с p=N
+  // Ищем все ссылки с p=N
+  const pLinks = html.match(/p=\d+/g) || [];
+  console.log("Найдены p= ссылки:", pLinks);
+
   const hrefMatches = html.matchAll(/p=(\d+)/g);
   for (const match of hrefMatches) {
     const pageNum = parseInt(match[1], 10);
     if (pageNum > totalPages) totalPages = pageNum;
   }
 
-  // Ищем номера страниц в скобках <N>
-  const bracketMatches = html.matchAll(/>\s*(\d+)\s*</g);
-  for (const match of bracketMatches) {
-    const pageNum = parseInt(match[1], 10);
-    if (pageNum > 1 && pageNum < 100 && pageNum > totalPages) {
-      totalPages = pageNum;
-    }
-  }
+  // Ищем пагинацию в разных форматах
+  const paginationArea = html.match(/class="[^"]*pag[^"]*"[^>]*>[\s\S]*?<\/[^>]+>/gi);
+  console.log("Область пагинации:", paginationArea?.slice(0, 2));
 
   console.log("Определено страниц:", totalPages);
   return totalPages;
