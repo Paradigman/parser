@@ -92,36 +92,55 @@ function parseDate(dateStr: string): Date {
 
 async function fetchCharacterAdena(cookies: string, characterId: string): Promise<number> {
   try {
-    const url = `https://interlude-online.com/lk.php?page=characters`;
+    // Страница информации о персонаже
+    const url = `https://interlude-online.com/lk.php?page=characterInfo&characterId=${characterId}`;
+    console.log("Запрос Adena:", url);
+    
     const response = await fetch(url, {
       headers: {
         Cookie: cookies,
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        Referer: "https://interlude-online.com/lk.html",
       },
     });
 
-    if (!response.ok) return 0;
+    if (!response.ok) {
+      console.log("Ошибка запроса Adena:", response.status);
+      return 0;
+    }
 
     const html = await response.text();
+    const textContent = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
     
-    // Ищем Adena рядом с ClanFire или в общем контексте
-    // Паттерн: Adena: 12345 или Adena 12 345
-    const adenaMatch = html.match(/Adena[:\s]*([0-9\s,.']+)/i);
-    if (adenaMatch) {
-      const adenaStr = adenaMatch[1].replace(/[\s,.']/g, "");
-      return parseInt(adenaStr, 10) || 0;
+    // Ищем Adena в разных форматах
+    // Формат: "Adena: 123456" или "Adena 123 456" или просто число после Adena
+    const adenaPatterns = [
+      /Adena[:\s]+([0-9\s,.']+)/i,
+      /Adena<[^>]*>([0-9\s,.']+)/i,
+    ];
+    
+    for (const pattern of adenaPatterns) {
+      const match = html.match(pattern) || textContent.match(pattern);
+      if (match) {
+        const adenaStr = match[1].replace(/[\s,.']/g, "").trim();
+        const adena = parseInt(adenaStr, 10);
+        if (adena > 0) {
+          console.log("Найдена Adena:", adena);
+          return adena;
+        }
+      }
     }
 
-    // Альтернативный поиск - ищем число после ClanFire и Adena
-    const textContent = html.replace(/<[^>]+>/g, " ");
-    const clanFireSection = textContent.match(/ClanFire[\s\S]{0,500}Adena[:\s]*([0-9\s,.']+)/i);
-    if (clanFireSection) {
-      const adenaStr = clanFireSection[1].replace(/[\s,.']/g, "");
-      return parseInt(adenaStr, 10) || 0;
+    // Поиск в таблице - ищем строку с Adena и следующее число
+    const tableMatch = textContent.match(/Adena[^0-9]*([0-9]+)/i);
+    if (tableMatch) {
+      const adena = parseInt(tableMatch[1], 10);
+      console.log("Найдена Adena в таблице:", adena);
+      return adena;
     }
 
-    console.log("Adena не найдена в HTML");
+    console.log("Adena не найдена. Превью HTML:", textContent.substring(0, 1000));
     return 0;
   } catch (error) {
     console.error("Ошибка получения Adena:", error);
