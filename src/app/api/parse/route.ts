@@ -12,45 +12,80 @@ function parseTransactions(html: string): Transaction[] {
 
   // Убираем HTML теги и декодируем entities
   const textContent = html
-    .replace(/<[^>]+>/g, " ")
+    .replace(/<[^>]+>/g, "\n")
     .replace(/&gt;/g, ">")
     .replace(/&lt;/g, "<")
     .replace(/&amp;/g, "&")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ");
+    .replace(/&nbsp;/g, " ");
 
-  // Ищем паттерн: ИмяПерсонажа -> ClanFire:СУММА a. (или с пробелами)
-  const paymentPattern = /(\w+)\s*->\s*ClanFire\s*[:\s]\s*(\d+)\s*a\./gi;
-  let match;
-  
-  while ((match = paymentPattern.exec(textContent)) !== null) {
-    const characterName = match[1];
-    const amount = parseInt(match[2], 10);
+  // Разбиваем на строки и ищем транзакции
+  const lines = textContent.split("\n");
+  let currentDate = "";
+
+  for (const line of lines) {
+    const trimmed = line.trim();
     
-    if (characterName && amount > 0 && characterName !== "ClanFire") {
-      transactions.push({
-        characterName,
-        amount,
-        date: "",
-        type: "Покупка",
-      });
+    // Ищем дату
+    const dateMatch = trimmed.match(/(\d{1,2}\s+\w{3}\s+\d{1,2}:\d{2})/);
+    if (dateMatch) {
+      currentDate = dateMatch[1];
+    }
+
+    // Ищем паттерн: ИмяПерсонажа -> ClanFire:СУММА a.
+    // Разные варианты написания
+    const patterns = [
+      /^(\w+)\s*->\s*ClanFire\s*:\s*(\d+)\s*a\./i,
+      /^(\w+)\s*->\s*ClanFire\s*(\d+)\s*a\./i,
+      /(\w+)\s*->\s*ClanFire\s*:\s*(\d+)\s*a\./i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = trimmed.match(pattern);
+      if (match) {
+        const characterName = match[1];
+        const amount = parseInt(match[2], 10);
+        
+        if (characterName && amount > 0 && characterName.toLowerCase() !== "clanfire") {
+          transactions.push({
+            characterName,
+            amount,
+            date: currentDate,
+            type: "Покупка",
+          });
+          break;
+        }
+      }
     }
   }
 
-  // Также ищем даты рядом с транзакциями
-  const datePattern = /(\d{1,2}\s+\w{3}\s+\d{1,2}:\d{2})/g;
-  const dates = textContent.match(datePattern) || [];
-  
-  // Присваиваем даты транзакциям (примерно)
-  transactions.forEach((tx, i) => {
-    if (dates[i]) {
-      tx.date = dates[i];
+  // Если не нашли построчно, попробуем глобальный поиск
+  if (transactions.length === 0) {
+    const globalText = textContent.replace(/\s+/g, " ");
+    const globalPattern = /(\w+)\s*->\s*ClanFire\s*:?\s*(\d+)\s*a\./gi;
+    let match;
+    
+    while ((match = globalPattern.exec(globalText)) !== null) {
+      const characterName = match[1];
+      const amount = parseInt(match[2], 10);
+      
+      if (characterName && amount > 0 && characterName.toLowerCase() !== "clanfire") {
+        transactions.push({
+          characterName,
+          amount,
+          date: "",
+          type: "Покупка",
+        });
+      }
     }
-  });
+  }
 
   console.log("Найдено транзакций:", transactions.length);
   if (transactions.length > 0) {
-    console.log("Первые транзакции:", transactions.slice(0, 5));
+    console.log("Первые 5 транзакций:", transactions.slice(0, 5));
+  } else {
+    // Debug: покажем что есть в тексте
+    const arrows = textContent.match(/\w+\s*->\s*\w+/g);
+    console.log("Стрелки в тексте:", arrows?.slice(0, 10));
   }
 
   return transactions;
@@ -197,12 +232,10 @@ export async function POST(request: Request) {
     const firstHtml = await firstResponse.text();
     console.log("Длина HTML:", firstHtml.length);
     
-    // Убираем теги для поиска
-    const textOnly = firstHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-    
-    // Ищем паттерн с ClanFire
-    const clanFirePattern = textOnly.match(/\w+\s*->\s*ClanFire\s*[:\s]\s*\d+\s*a\./gi);
-    console.log("Транзакции к ClanFire:", clanFirePattern?.slice(0, 10));
+    // Debug: ищем все паттерны платежей
+    const textOnly = firstHtml.replace(/<[^>]+>/g, " ");
+    const allPayments = textOnly.match(/\w+\s*->\s*ClanFire[^<\n]*/gi);
+    console.log("Все платежи ClanFire:", allPayments?.slice(0, 5));
 
     if (firstHtml.includes("авторизуйтесь") || firstHtml.includes("Пожалуйста, авторизуйтесь")) {
       return NextResponse.json(
