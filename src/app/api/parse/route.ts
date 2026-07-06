@@ -89,6 +89,13 @@ function findTotalPages(html: string): number {
   return totalPages;
 }
 
+// Гарантирует, что в строке кук есть минимум две куки. Сайт (анти-бот) считает
+// ботом запрос, где присутствует только JSESSIONID, и редиректит на /auth.html.
+function ensureSecondCookie(cookies: string): string {
+  const hasSecond = cookies.split(";").map((c) => c.trim()).filter(Boolean).length >= 2;
+  return hasSecond ? cookies : `${cookies.trim()}; _ga=GA1.1.1.1`;
+}
+
 function parseDate(dateStr: string): Date {
   const months: Record<string, number> = {
     Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
@@ -179,6 +186,11 @@ export async function POST(request: Request) {
     if (!cookies.includes("=")) {
       cookies = `JSESSIONID=${cookies}`;
     }
+
+    // Анти-бот сайта отбивает запросы, где JSESSIONID — единственная кука
+    // (редирект на /auth.html). Реальный браузер всегда шлёт ещё и аналитику,
+    // поэтому добавляем безобидную вторую куку, если её нет.
+    cookies = ensureSecondCookie(cookies);
 
     const charId = characterId || "269640652";
     const allTransactions: Transaction[] = [];
